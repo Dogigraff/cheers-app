@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 187 100% 50%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 187 100% 50%;
+    --radius: 0.5rem;
+    --neon-cyan: #00f3ff;
+    --neon-pink: #ff00ff;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 40%, #000000 100%);
+    min-height: 100%;
+  }
+  body {
+    @apply text-foreground;
+    background: transparent !important;
+    color: #fafafa !important;
+    min-height: 100vh;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ========== Glassmorphism ========== */
+.glass-panel {
+  background: rgba(20, 20, 30, 0.6);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* ========== Neon accents ========== */
+.neon-border {
+  border-color: rgba(0, 243, 255, 0.5);
+  box-shadow: 0 0 12px rgba(0, 243, 255, 0.3);
+}
+.neon-glow {
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.4), 0 0 40px rgba(0, 243, 255, 0.2);
+}
+.neon-text {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+}
+
+.input-neon:focus-visible {
+  box-shadow: 0 0 0 2px rgba(0, 243, 255, 0.3);
+}
+
+/* ========== Animations ========== */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(0, 243, 255, 0.6));
+  }
+  50% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 14px rgba(0, 243, 255, 0.9));
+  }
+}
+
+@keyframes beacon-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.4);
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.95;
+    box-shadow: 0 0 0 12px rgba(0, 243, 255, 0);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+.beacon-marker {
+  animation: beacon-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================
+   CYBERPUNK MOSCOW - Dark Mode для Яндекс.Карт
+   ============================================ */
+
+.yandex-map-dark {
+  background: radial-gradient(ellipse at center, #0d0d12 0%, #000000 100%) !important;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+}
+
+.yandex-map-dark canvas {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.15) !important;
+}
+
+.yandex-map-dark [class*="ymaps"][class*="placemark"] {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+.yandex-map-dark [class*="ymaps"][class*="balloon"] {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+.yandex-map-dark [class*="image-with-content-content"],
+.yandex-map-dark [class*="image-with-content"] > div {
+  filter: invert(1) hue-rotate(180deg) !important;
+  font-size: 28px !important;
+  line-height: 40px !important;
+  text-align: center !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(0, 243, 255, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 243, 255, 0.2) !important;
+  width: 40px !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  animation: beacon-pulse 2s ease-in-out infinite;
+}
+
+.yandex-map-dark .beacon-marker,
+.yandex-map-dark [class*="placemark"] {
+  animation: beacon-pulse 2s ease-in-out infinite;
+}
+
+.yandex-map-dark [class*="controls"] {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
