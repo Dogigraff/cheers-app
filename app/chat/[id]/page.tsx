@@ -46,7 +46,7 @@ export default function ChatPage() {
       if (user) setCurrentUserId(user.id);
 
       const { data: members } = await supabase
-        .from("party_members")
+        .from("party_members" as any)
         .select("user_id")
         .eq("beacon_id", beaconId);
 
@@ -61,7 +61,7 @@ export default function ChatPage() {
       }
 
       const { data: initialMessages, error: msgError } = await supabase
-        .from("messages")
+        .from("messages" as any)
         .select("id, content, user_id, created_at")
         .eq("beacon_id", beaconId)
         .order("created_at", { ascending: true });
@@ -118,7 +118,7 @@ export default function ChatPage() {
       // Realtime will add the message; optionally refetch to ensure order
       const supabase = createClient() as unknown as SupabaseClient<Database>;
       const { data } = await supabase
-        .from("messages")
+        .from("messages" as any)
         .select("id, content, user_id, created_at")
         .eq("beacon_id", beaconId)
         .order("created_at", { ascending: true });

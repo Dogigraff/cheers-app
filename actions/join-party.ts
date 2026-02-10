@@ -29,7 +29,7 @@ export async function joinParty(beaconId: string): Promise<JoinPartyResult> {
 
     // Idempotent: check if user is already in party_members for this beacon (use user_id)
     const { data: existing } = await supabase
-      .from("party_members")
+      .from("party_members" as any)
       .select("id")
       .eq("beacon_id", beaconId)
       .eq("user_id", user.id)
@@ -39,7 +39,7 @@ export async function joinParty(beaconId: string): Promise<JoinPartyResult> {
       return { success: true, matchId: beaconId };
     }
 
-    const { error: insertError } = await supabase.from("party_members").insert({
+    const { error: insertError } = await supabase.from("party_members" as any).insert({
       beacon_id: beaconId,
       user_id: user.id,
     });

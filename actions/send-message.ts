@@ -35,7 +35,7 @@ export async function sendMessage(
     );
 
     const { data, error } = await supabase
-      .from("messages")
+      .from("messages" as any)
       .insert({
         beacon_id: beaconId,
         user_id: user.id,
