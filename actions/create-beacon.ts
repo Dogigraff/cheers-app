@@ -39,16 +39,21 @@ export async function createBeacon(params: CreateBeaconParams) {
     // PostGIS/ST_Point: longitude first, then latitude (WKT standard)
     const locationWKT = `POINT(${params.location.lng} ${params.location.lat})`;
 
-    // Use RPC function to properly handle GEOGRAPHY type
-    const args = {
-      p_user_id: user.id,
-      p_location_wkt: locationWKT,
-      p_mood: params.mood,
-      p_assets: params.assets as import("@/types/supabase").Json,
-      p_expires_at: params.expiresAt,
-      p_location_name: params.locationName ?? null,
-    };
-    const { data, error } = await db.rpc("create_beacon_with_location", args);
+    const expiresAt = params.expiresAt;
+
+    // Direct insert — bypass strict types with `as any` for the new location_name column
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (db.from("beacons") as any)
+      .insert({
+        user_id: user.id,
+        location: locationWKT,
+        mood: params.mood,
+        assets: params.assets,
+        expires_at: expiresAt,
+        location_name: params.locationName || null,
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error("Error creating beacon:", error);
