@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flame, MapPin, Search } from "lucide-react";
+import { YMaps, useYMaps } from "@pbe/react-yandex-maps";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,34 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { createBeacon } from "@/actions/create-beacon";
 import { toast } from "sonner";
-
-/* ------------------------------------------------------------------ */
-/*  Yandex Maps global type augmentation (window.ymaps)               */
-/* ------------------------------------------------------------------ */
-declare global {
-  interface Window {
-    ymaps?: {
-      ready: (callback: () => void) => void;
-      geocode: (query: string) => Promise<YmapsGeoResult>;
-    };
-  }
-}
-
-interface YmapsGeoObject {
-  geometry: {
-    getCoordinates: () => [number, number]; // [lat, lng]
-  };
-  getAddressLine: () => string;
-  properties: {
-    get: (key: string) => string;
-  };
-}
-
-interface YmapsGeoResult {
-  geoObjects: {
-    get: (index: number) => YmapsGeoObject | undefined;
-  };
-}
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -50,10 +23,12 @@ const DRINK_TYPES = [
 ] as const;
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                          */
+/*  Inner component (must be inside <YMaps> to use useYMaps)           */
 /* ------------------------------------------------------------------ */
-export function CreateBeaconBtn() {
+function CreateBeaconBtnInner() {
   const router = useRouter();
+  const ymaps = useYMaps(["geocode"]);
+
   const [open, setOpen] = useState(false);
   const [mood, setMood] = useState("");
   const [drinkType, setDrinkType] = useState<string>("beer");
@@ -101,17 +76,15 @@ export function CreateBeaconBtn() {
   const handleToggleMode = (mode: "gps" | "search") => {
     setLocationMode(mode);
     if (mode === "gps") {
-      // Reset search state when switching back to GPS
       setSearchQuery("");
       setLocationName("");
     } else {
-      // Clear GPS location when switching to search
       setUserLocation(null);
       setLocationName("");
     }
   };
 
-  /* ---- Yandex geocode handler ---- */
+  /* ---- Yandex geocode handler (via useYMaps) ---- */
   const handleGeocode = async () => {
     const query = searchQuery.trim();
     if (!query) {
@@ -119,14 +92,15 @@ export function CreateBeaconBtn() {
       return;
     }
 
-    if (!window.ymaps) {
-      toast.error("Yandex Maps is not loaded yet. Please wait and try again.");
+    if (!ymaps) {
+      toast.error("Maps API is still loading, please wait...");
       return;
     }
 
     setGeocoding(true);
     try {
-      const result = await window.ymaps.geocode(query);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: any = await ymaps.geocode(query);
       const firstGeoObject = result.geoObjects.get(0);
 
       if (!firstGeoObject) {
@@ -135,8 +109,8 @@ export function CreateBeaconBtn() {
         return;
       }
 
-      const coords = firstGeoObject.geometry.getCoordinates();
-      const address =
+      const coords: [number, number] = firstGeoObject.geometry.getCoordinates();
+      const address: string =
         firstGeoObject.getAddressLine?.() ??
         firstGeoObject.properties.get("text") ??
         query;
@@ -278,9 +252,9 @@ export function CreateBeaconBtn() {
                       type="button"
                       variant="secondary"
                       onClick={() => void handleGeocode()}
-                      disabled={geocoding || !searchQuery.trim()}
+                      disabled={geocoding || !searchQuery.trim() || !ymaps}
                     >
-                      {geocoding ? "..." : "Find"}
+                      {geocoding ? "..." : !ymaps ? "⏳" : "Find"}
                     </Button>
                   </div>
                   {locationName && (
@@ -364,5 +338,24 @@ export function CreateBeaconBtn() {
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Exported wrapper — provides its own YMaps context                  */
+/* ------------------------------------------------------------------ */
+export function CreateBeaconBtn() {
+  return (
+    <YMaps
+      query={{
+        lang: "ru_RU",
+        ...(process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY &&
+          process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY.trim() !== "" && {
+          apikey: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
+        }),
+      }}
+    >
+      <CreateBeaconBtnInner />
+    </YMaps>
   );
 }
