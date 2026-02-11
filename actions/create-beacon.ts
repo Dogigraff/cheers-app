@@ -13,6 +13,7 @@ interface CreateBeaconParams {
     lng: number;
   };
   expiresAt: string;
+  locationName?: string;
 }
 
 export async function createBeacon(params: CreateBeaconParams) {
@@ -45,6 +46,7 @@ export async function createBeacon(params: CreateBeaconParams) {
       p_mood: params.mood,
       p_assets: params.assets as import("@/types/supabase").Json,
       p_expires_at: params.expiresAt,
+      p_location_name: params.locationName ?? null,
     };
     const { data, error } = await db.rpc("create_beacon_with_location", args);
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Flame } from "lucide-react";
+import { Flame, MapPin, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,37 @@ import { Slider } from "@/components/ui/slider";
 import { createBeacon } from "@/actions/create-beacon";
 import { toast } from "sonner";
 
+/* ------------------------------------------------------------------ */
+/*  Yandex Maps global type augmentation (window.ymaps)               */
+/* ------------------------------------------------------------------ */
+declare global {
+  interface Window {
+    ymaps?: {
+      ready: (callback: () => void) => void;
+      geocode: (query: string) => Promise<YmapsGeoResult>;
+    };
+  }
+}
+
+interface YmapsGeoObject {
+  geometry: {
+    getCoordinates: () => [number, number]; // [lat, lng]
+  };
+  getAddressLine: () => string;
+  properties: {
+    get: (key: string) => string;
+  };
+}
+
+interface YmapsGeoResult {
+  geoObjects: {
+    get: (index: number) => YmapsGeoObject | undefined;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
 const DRINK_TYPES = [
   { emoji: "🍷", type: "wine", label: "Wine" },
   { emoji: "🍺", type: "beer", label: "Beer" },
@@ -18,6 +49,9 @@ const DRINK_TYPES = [
   { emoji: "🍸", type: "vodka", label: "Vodka" },
 ] as const;
 
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 export function CreateBeaconBtn() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -27,31 +61,98 @@ export function CreateBeaconBtn() {
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
+  // --- Location mode state ---
+  const [locationMode, setLocationMode] = useState<"gps" | "search">("gps");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [geocoding, setGeocoding] = useState(false);
+
+  /* ---- Open handler (GPS acquisition on open) ---- */
   const handleOpen = () => {
-    // Get user location when opening the drawer
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setOpen(true);
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          // Fallback to Moscow center for demo
-          setUserLocation({ lat: 55.76, lng: 37.59 });
-          setOpen(true);
-        }
-      );
+    if (locationMode === "gps") {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+            setOpen(true);
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+            // Fallback to Moscow center for demo
+            setUserLocation({ lat: 55.76, lng: 37.59 });
+            setOpen(true);
+          }
+        );
+      } else {
+        // Fallback to Moscow center
+        setUserLocation({ lat: 55.76, lng: 37.59 });
+        setOpen(true);
+      }
     } else {
-      // Fallback to Moscow center
-      setUserLocation({ lat: 55.76, lng: 37.59 });
+      // Search mode — open immediately, user will search manually
       setOpen(true);
     }
   };
 
+  /* ---- Toggle location mode ---- */
+  const handleToggleMode = (mode: "gps" | "search") => {
+    setLocationMode(mode);
+    if (mode === "gps") {
+      // Reset search state when switching back to GPS
+      setSearchQuery("");
+      setLocationName("");
+    } else {
+      // Clear GPS location when switching to search
+      setUserLocation(null);
+      setLocationName("");
+    }
+  };
+
+  /* ---- Yandex geocode handler ---- */
+  const handleGeocode = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      toast.error("Please enter an address or place name");
+      return;
+    }
+
+    if (!window.ymaps) {
+      toast.error("Yandex Maps is not loaded yet. Please wait and try again.");
+      return;
+    }
+
+    setGeocoding(true);
+    try {
+      const result = await window.ymaps.geocode(query);
+      const firstGeoObject = result.geoObjects.get(0);
+
+      if (!firstGeoObject) {
+        toast.error("No results found for this query");
+        setGeocoding(false);
+        return;
+      }
+
+      const coords = firstGeoObject.geometry.getCoordinates();
+      const address =
+        firstGeoObject.getAddressLine?.() ??
+        firstGeoObject.properties.get("text") ??
+        query;
+
+      setUserLocation({ lat: coords[0], lng: coords[1] });
+      setLocationName(address);
+      toast.success(`Found: ${address}`);
+    } catch (error) {
+      console.error("Geocode error:", error);
+      toast.error("Failed to find location. Please try a different query.");
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  /* ---- Submit ---- */
   const handleSubmit = async () => {
     if (!mood.trim()) {
       toast.error("Please enter a mood");
@@ -59,7 +160,11 @@ export function CreateBeaconBtn() {
     }
 
     if (!userLocation) {
-      toast.error("Location not available");
+      toast.error(
+        locationMode === "search"
+          ? "Please search for a location first"
+          : "Location not available"
+      );
       return;
     }
 
@@ -79,6 +184,7 @@ export function CreateBeaconBtn() {
           lng: userLocation.lng,
         },
         expiresAt: expiresAt.toISOString(),
+        ...(locationName ? { locationName } : {}),
       });
 
       toast.success("Beacon created! 🔥");
@@ -86,6 +192,8 @@ export function CreateBeaconBtn() {
       setMood("");
       setDrinkType("beer");
       setDuration([2]);
+      setSearchQuery("");
+      setLocationName("");
       router.refresh();
       window.dispatchEvent(new CustomEvent("beacons-refresh"));
     } catch (error) {
@@ -122,6 +230,75 @@ export function CreateBeaconBtn() {
           </SheetHeader>
 
           <div className="mt-6 space-y-6">
+            {/* Location Mode Toggle */}
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleToggleMode("gps")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${locationMode === "gps"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  Use GPS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleMode("search")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${locationMode === "search"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
+                >
+                  <Search className="w-4 h-4" />
+                  Search Place
+                </button>
+              </div>
+
+              {/* Search mode: address input + Find button */}
+              {locationMode === "search" && (
+                <div className="space-y-2 pt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g., Красная площадь, Bar XYZ..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleGeocode();
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void handleGeocode()}
+                      disabled={geocoding || !searchQuery.trim()}
+                    >
+                      {geocoding ? "..." : "Find"}
+                    </Button>
+                  </div>
+                  {locationName && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      📍 {locationName}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* GPS mode: show status */}
+              {locationMode === "gps" && userLocation && (
+                <p className="text-xs text-muted-foreground">
+                  📍 GPS: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                </p>
+              )}
+            </div>
+
             {/* Mood Input */}
             <div className="space-y-2">
               <Label htmlFor="mood">Mood / Description</Label>
@@ -143,11 +320,10 @@ export function CreateBeaconBtn() {
                     key={drink.type}
                     type="button"
                     onClick={() => setDrinkType(drink.type)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      drinkType === drink.type
+                    className={`p-4 rounded-lg border-2 transition-all ${drinkType === drink.type
                         ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(255,0,0,0.3)]"
                         : "border-border hover:border-primary/50"
-                    }`}
+                      }`}
                   >
                     <div className="text-3xl mb-1">{drink.emoji}</div>
                     <div className="text-xs text-muted-foreground">{drink.label}</div>
