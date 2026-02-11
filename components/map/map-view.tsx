@@ -6,12 +6,11 @@ import { useNearbyBeacons, type NearbyBeacon } from "@/hooks/use-nearby-beacons"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, Users, LogOut } from "lucide-react";
+import { MapPin, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { joinParty } from "@/actions/join-party";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
-import type { User } from "@supabase/supabase-js";
 
 // Get emoji for asset type (safe for SSR/hydration)
 function getAssetEmoji(assets: NearbyBeacon["assets"]): string {
@@ -163,36 +162,6 @@ export function MapView() {
   const [selectedBeacon, setSelectedBeacon] = useState<NearbyBeacon | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    void supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    if (dropdownOpen) {
-      document.addEventListener("click", handleClickOutside);
-      return () => document.removeEventListener("click", handleClickOutside);
-    }
-  }, [dropdownOpen]);
-
-  const handleLogOut = async () => {
-    await supabase.auth.signOut();
-    setDropdownOpen(false);
-    router.push("/login");
-    router.refresh();
-  };
 
   useEffect(() => {
     const handler = () => refetch();
@@ -318,36 +287,6 @@ export function MapView() {
 
   return (
     <div className="relative w-full h-screen bg-black">
-      <header className="absolute top-0 left-0 right-0 z-[1000] flex justify-end p-3 pointer-events-none">
-        <div className="pointer-events-auto" ref={dropdownRef}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11 rounded-full bg-background/90 backdrop-blur-sm border border-border hover:bg-accent"
-            onClick={() => setDropdownOpen((o) => !o)}
-            aria-label="Account menu"
-          >
-            <Avatar className="h-9 w-9">
-              <AvatarImage src={user?.user_metadata?.avatar_url as string | undefined} />
-              <AvatarFallback className="bg-secondary text-secondary-foreground">
-                {user?.email?.charAt(0).toUpperCase() ?? "?"}
-              </AvatarFallback>
-            </Avatar>
-          </Button>
-          {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-border bg-card shadow-lg py-1">
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                onClick={handleLogOut}
-              >
-                <LogOut className="h-4 w-4" />
-                Log Out
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
       <YMaps
         query={{
           lang: "ru_RU",

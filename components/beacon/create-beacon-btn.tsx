@@ -182,7 +182,7 @@ function CreateBeaconBtnInner() {
     <>
       <button
         onClick={handleOpen}
-        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000]
+        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[1000]
                    w-16 h-16 rounded-full flex items-center justify-center
                    bg-gradient-to-br from-neon-cyan to-[#0099aa] text-black font-semibold
                    shadow-[0_0_24px_rgba(0,243,255,0.6),0_0_48px_rgba(0,243,255,0.3)]
@@ -212,8 +212,8 @@ function CreateBeaconBtnInner() {
                   type="button"
                   onClick={() => handleToggleMode("gps")}
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${locationMode === "gps"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50"
                     }`}
                 >
                   <MapPin className="w-4 h-4" />
@@ -223,8 +223,8 @@ function CreateBeaconBtnInner() {
                   type="button"
                   onClick={() => handleToggleMode("search")}
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${locationMode === "search"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50"
                     }`}
                 >
                   <Search className="w-4 h-4" />
@@ -295,8 +295,8 @@ function CreateBeaconBtnInner() {
                     type="button"
                     onClick={() => setDrinkType(drink.type)}
                     className={`p-4 rounded-lg border-2 transition-all ${drinkType === drink.type
-                        ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(255,0,0,0.3)]"
-                        : "border-border hover:border-primary/50"
+                      ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(255,0,0,0.3)]"
+                      : "border-border hover:border-primary/50"
                       }`}
                   >
                     <div className="text-3xl mb-1">{drink.emoji}</div>

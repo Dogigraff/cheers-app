@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { MainLayout } from "@/components/layout/main-layout";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="dark" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
-        {children}
+        <MainLayout>{children}</MainLayout>
         <Toaster position="top-center" theme="dark" />
       </body>
     </html>
