@@ -24,7 +24,7 @@ export async function createBeacon(params: CreateBeaconParams) {
       throw new Error("You must be logged in to create a beacon");
     }
 
-    // Ensure profile exists (beacons.user_id FK → profiles.id). Create if missing.
+    // Ensure profile exists (beacons.user_id FK → profiles.id). Create only if missing — do NOT overwrite avatar.
     const db = supabase as unknown as import("@supabase/supabase-js").SupabaseClient<import("@/types/supabase").Database>;
     await db.from("profiles").upsert(
       {
@@ -33,7 +33,7 @@ export async function createBeacon(params: CreateBeaconParams) {
         avatar_url: (user.user_metadata?.avatar_url as string) ?? null,
         reputation: 100,
       },
-      { onConflict: "id" }
+      { onConflict: "id", ignoreDuplicates: true }
     );
 
     // PostGIS/ST_Point: longitude first, then latitude (WKT standard)

@@ -41,7 +41,7 @@ const MOSCOW_CENTER = { lat: 55.763, long: 37.593 }; // Patriarch Ponds
 const supabase = createClient();
 
 export function useNearbyBeacons(
-  radiusMeters: number = 5000
+  radiusMeters: number = 20000
 ): UseNearbyBeaconsReturn {
   const [beacons, setBeacons] = useState<NearbyBeacon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,10 +84,10 @@ export function useNearbyBeacons(
           } as NearbyBeacon;
         });
 
-        // If 0 beacons nearby — try with world radius (demo fallback)
+        // If 0 beacons nearby — try with 100km radius (wider area, avoid flip-flop)
         if (normalized.length === 0 && !fallbackRadius) {
-          console.log("[Beacons] No nearby results, trying world radius…");
-          const WORLD_RADIUS_M = 50_000_000; // ~50 000 km
+          console.log("[Beacons] No nearby results, trying 100km radius…");
+          const FALLBACK_RADIUS_M = 100_000; // 100 km
           const res = await (
             supabase as unknown as import("@supabase/supabase-js").SupabaseClient<
               import("@/types/supabase").Database
@@ -95,7 +95,7 @@ export function useNearbyBeacons(
           ).rpc("get_nearby_beacons", {
             lat,
             long,
-            radius_meters: Math.round(WORLD_RADIUS_M),
+            radius_meters: Math.round(FALLBACK_RADIUS_M),
           });
           if (!res.error && res.data?.length) {
             console.log("[Beacons] World radius data:", res.data);

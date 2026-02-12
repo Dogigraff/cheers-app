@@ -84,27 +84,44 @@ function CreateBeaconBtnInner() {
     }
   };
 
-  /* ---- Yandex geocode handler (via useYMaps) ---- */
+  /* ---- Yandex geocode handler — uses suggest for places, geocode for addresses ---- */
   const handleGeocode = async () => {
     const query = searchQuery.trim();
     if (!query) {
-      toast.error("Please enter an address or place name");
+      toast.error("Введите адрес или название заведения");
       return;
     }
 
     if (!ymaps) {
-      toast.error("Maps API is still loading, please wait...");
+      toast.error("Карты загружаются, подождите...");
       return;
     }
 
     setGeocoding(true);
     try {
+      // Improve query: add city for short/vague queries so we get specific places, not just "Москва"
+      const hasCity = /москва|moscow|spb|питер|санкт|улица|ул\.|пр\.|пр-т|проспект|красная|тверская/i.test(query);
+      const geocodeQuery = !hasCity && query.length < 35 ? `${query}, Москва` : query;
+
+      // 2. Geocode to get coordinates
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result: any = await ymaps.geocode(query);
-      const firstGeoObject = result.geoObjects.get(0);
+      const result: any = await ymaps.geocode(geocodeQuery, { results: 5 });
+      const geoObjects = result.geoObjects;
+      let firstGeoObject = geoObjects.get(0);
+
+      // Skip overly generic results (e.g. whole city, not a specific place)
+      const cityOnly = /^москва(\s|,|$)|^moscow(\s|,|$)/i;
+      for (let i = 0; i < Math.min(5, geoObjects.getLength()); i++) {
+        const obj = geoObjects.get(i);
+        const name = obj.getAddressLine?.() ?? obj.properties?.get?.("text") ?? "";
+        if (!cityOnly.test(name)) {
+          firstGeoObject = obj;
+          break;
+        }
+      }
 
       if (!firstGeoObject) {
-        toast.error("No results found for this query");
+        toast.error("Ничего не найдено. Попробуйте: «Красная площадь 1» или «Тверская 10»");
         setGeocoding(false);
         return;
       }
@@ -112,15 +129,15 @@ function CreateBeaconBtnInner() {
       const coords: [number, number] = firstGeoObject.geometry.getCoordinates();
       const address: string =
         firstGeoObject.getAddressLine?.() ??
-        firstGeoObject.properties.get("text") ??
+        firstGeoObject.properties?.get?.("text") ??
         query;
 
       setUserLocation({ lat: coords[0], lng: coords[1] });
       setLocationName(address);
-      toast.success(`Found: ${address}`);
+      toast.success(`Найдено: ${address}`);
     } catch (error) {
       console.error("Geocode error:", error);
-      toast.error("Failed to find location. Please try a different query.");
+      toast.error("Не удалось найти. Введите точный адрес, например: Красная площадь 1");
     } finally {
       setGeocoding(false);
     }
@@ -349,9 +366,11 @@ export function CreateBeaconBtn() {
     <YMaps
       query={{
         lang: "ru_RU",
-        ...(process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY &&
-          process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY.trim() !== "" && {
+        ...(process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY?.trim() && {
           apikey: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
+          ...(process.env.NEXT_PUBLIC_YANDEX_SUGGEST_API_KEY?.trim() && {
+            suggest_apikey: process.env.NEXT_PUBLIC_YANDEX_SUGGEST_API_KEY,
+          }),
         }),
       }}
     >

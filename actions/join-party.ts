@@ -16,7 +16,7 @@ export async function joinParty(beaconId: string): Promise<JoinPartyResult> {
       return { success: false, error: "You must be logged in to join a party" };
     }
 
-    // Ensure profile exists (for display in chat)
+    // Ensure profile exists (for display in chat). Do NOT overwrite custom avatar.
     await supabase.from("profiles").upsert(
       {
         id: user.id,
@@ -24,7 +24,7 @@ export async function joinParty(beaconId: string): Promise<JoinPartyResult> {
         avatar_url: (user.user_metadata?.avatar_url as string) ?? null,
         reputation: 100,
       },
-      { onConflict: "id" }
+      { onConflict: "id", ignoreDuplicates: true }
     );
 
     // Idempotent: check if user is already in party_members for this beacon (use user_id)

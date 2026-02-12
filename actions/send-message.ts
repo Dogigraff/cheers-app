@@ -24,6 +24,7 @@ export async function sendMessage(
       return { success: false, error: "You must be logged in to send messages" };
     }
 
+    // Ensure profile exists. Do NOT overwrite custom avatar.
     await supabase.from("profiles").upsert(
       {
         id: user.id,
@@ -31,7 +32,7 @@ export async function sendMessage(
         avatar_url: (user.user_metadata?.avatar_url as string) ?? null,
         reputation: 100,
       },
-      { onConflict: "id" }
+      { onConflict: "id", ignoreDuplicates: true }
     );
 
     const { data, error } = await supabase
