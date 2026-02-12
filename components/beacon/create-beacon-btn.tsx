@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Flame, MapPin, Search } from "lucide-react";
-import { YMaps, useYMaps } from "@pbe/react-yandex-maps";
+import { YMaps } from "@pbe/react-yandex-maps";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { createBeacon } from "@/actions/create-beacon";
@@ -27,7 +28,6 @@ const DRINK_TYPES = [
 /* ------------------------------------------------------------------ */
 function CreateBeaconBtnInner() {
   const router = useRouter();
-  const ymaps = useYMaps(["geocode"]);
 
   const [open, setOpen] = useState(false);
   const [mood, setMood] = useState("");
@@ -38,9 +38,18 @@ function CreateBeaconBtnInner() {
 
   // --- Location mode state ---
   const [locationMode, setLocationMode] = useState<"gps" | "search">("gps");
-  const [searchQuery, setSearchQuery] = useState("");
   const [locationName, setLocationName] = useState("");
-  const [geocoding, setGeocoding] = useState(false);
+  const [suggestCenter, setSuggestCenter] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (locationMode === "search" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setSuggestCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setSuggestCenter(null),
+        { maximumAge: 60000 }
+      );
+    }
+  }, [locationMode]);
 
   /* ---- Open handler (GPS acquisition on open) ---- */
   const handleOpen = () => {
@@ -76,7 +85,6 @@ function CreateBeaconBtnInner() {
   const handleToggleMode = (mode: "gps" | "search") => {
     setLocationMode(mode);
     if (mode === "gps") {
-      setSearchQuery("");
       setLocationName("");
     } else {
       setUserLocation(null);
@@ -84,63 +92,9 @@ function CreateBeaconBtnInner() {
     }
   };
 
-  /* ---- Yandex geocode handler — uses suggest for places, geocode for addresses ---- */
-  const handleGeocode = async () => {
-    const query = searchQuery.trim();
-    if (!query) {
-      toast.error("Введите адрес или название заведения");
-      return;
-    }
-
-    if (!ymaps) {
-      toast.error("Карты загружаются, подождите...");
-      return;
-    }
-
-    setGeocoding(true);
-    try {
-      // Improve query: add city for short/vague queries so we get specific places, not just "Москва"
-      const hasCity = /москва|moscow|spb|питер|санкт|улица|ул\.|пр\.|пр-т|проспект|красная|тверская/i.test(query);
-      const geocodeQuery = !hasCity && query.length < 35 ? `${query}, Москва` : query;
-
-      // 2. Geocode to get coordinates
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result: any = await ymaps.geocode(geocodeQuery, { results: 5 });
-      const geoObjects = result.geoObjects;
-      let firstGeoObject = geoObjects.get(0);
-
-      // Skip overly generic results (e.g. whole city, not a specific place)
-      const cityOnly = /^москва(\s|,|$)|^moscow(\s|,|$)/i;
-      for (let i = 0; i < Math.min(5, geoObjects.getLength()); i++) {
-        const obj = geoObjects.get(i);
-        const name = obj.getAddressLine?.() ?? obj.properties?.get?.("text") ?? "";
-        if (!cityOnly.test(name)) {
-          firstGeoObject = obj;
-          break;
-        }
-      }
-
-      if (!firstGeoObject) {
-        toast.error("Ничего не найдено. Попробуйте: «Красная площадь 1» или «Тверская 10»");
-        setGeocoding(false);
-        return;
-      }
-
-      const coords: [number, number] = firstGeoObject.geometry.getCoordinates();
-      const address: string =
-        firstGeoObject.getAddressLine?.() ??
-        firstGeoObject.properties?.get?.("text") ??
-        query;
-
-      setUserLocation({ lat: coords[0], lng: coords[1] });
-      setLocationName(address);
-      toast.success(`Найдено: ${address}`);
-    } catch (error) {
-      console.error("Geocode error:", error);
-      toast.error("Не удалось найти. Введите точный адрес, например: Красная площадь 1");
-    } finally {
-      setGeocoding(false);
-    }
+  const handleLocationSelect = (result: { name: string; lat: number; lng: number }) => {
+    setUserLocation({ lat: result.lat, lng: result.lng });
+    setLocationName(result.name);
   };
 
   /* ---- Submit ---- */
@@ -183,7 +137,6 @@ function CreateBeaconBtnInner() {
       setMood("");
       setDrinkType("beer");
       setDuration([2]);
-      setSearchQuery("");
       setLocationName("");
       router.refresh();
       window.dispatchEvent(new CustomEvent("beacons-refresh"));
@@ -249,31 +202,14 @@ function CreateBeaconBtnInner() {
                 </button>
               </div>
 
-              {/* Search mode: address input + Find button */}
+              {/* Search mode: LocationAutocomplete (Taxi-like dropdown) */}
               {locationMode === "search" && (
                 <div className="space-y-2 pt-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g., Красная площадь, Bar XYZ..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void handleGeocode();
-                        }
-                      }}
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void handleGeocode()}
-                      disabled={geocoding || !searchQuery.trim() || !ymaps}
-                    >
-                      {geocoding ? "..." : !ymaps ? "⏳" : "Find"}
-                    </Button>
-                  </div>
+                  <LocationAutocomplete
+                    onSelect={handleLocationSelect}
+                    mapCenter={userLocation ?? suggestCenter ?? undefined}
+                    placeholder="Красная площадь, Bar XYZ…"
+                  />
                   {locationName && (
                     <p className="text-xs text-muted-foreground truncate">
                       📍 {locationName}
