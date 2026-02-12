@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Save, Sparkles } from "lucide-react";
+import { Camera, LogOut, Save } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { updateProfile } from "@/actions/update-profile";
+import { updateProfile, updateAvatar } from "@/actions/update-profile";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 
@@ -29,6 +29,9 @@ export default function ProfilePage() {
   const [signingOut, setSigningOut] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [displayNameDirty, setDisplayNameDirty] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -90,6 +93,49 @@ export default function ProfilePage() {
     router.refresh();
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Формат: JPG, PNG, WebP или GIF");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Макс. размер 5 МБ");
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) {
+        toast.error(uploadError.message);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+
+      const result = await updateAvatar(urlData.publicUrl);
+      if (result.success) {
+        setProfile((p) => (p ? { ...p, avatar_url: urlData.publicUrl } : null));
+        setAvatarVersion((v) => v + 1);
+        toast.success("Фото обновлено");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error("Ошибка загрузки");
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
+
   const reputationDisplay = profile?.reputation != null
     ? `Level ${Math.min(5, Math.floor(profile.reputation / 100) + 1)} · ${profile.reputation} Points`
     : "Level 1 · 0 Points";
@@ -123,32 +169,54 @@ export default function ProfilePage() {
           }}
         >
           <div className="flex flex-col items-center">
-            {/* Avatar with glowing cyan border */}
+            {/* Avatar with glowing border — tap to change photo */}
             <div className="relative mb-6">
-              <div
-                className="rounded-full p-1"
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                aria-label="Изменить фото"
+                className="block rounded-full p-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black"
                 style={{
                   boxShadow: "0 0 24px rgba(0, 243, 255, 0.5), 0 0 48px rgba(0, 243, 255, 0.2)",
                   background: "linear-gradient(135deg, rgba(0,243,255,0.6) 0%, rgba(0,243,255,0.2) 100%)",
                 }}
               >
                 <Avatar className="w-24 h-24 rounded-full border-2 border-transparent">
-                  <AvatarImage src={profile?.avatar_url ?? undefined} />
+                  <AvatarImage
+                    src={
+                      profile?.avatar_url
+                        ? `${profile.avatar_url}${profile.avatar_url.includes("?") ? "&" : "?"}v=${avatarVersion}`
+                        : undefined
+                    }
+                    alt="Avatar"
+                  />
                   <AvatarFallback
                     className="rounded-full text-2xl font-bold text-cyan-400"
                     style={{ backgroundColor: "#18181b", color: "#22d3ee" }}
                   >
-                    {(profile?.username ?? displayName || "U").charAt(0).toUpperCase()}
+                    {uploadingAvatar ? "…" : (profile?.username ?? displayName || "U").charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-              </div>
+              </button>
               <div
-                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center pointer-events-none"
                 style={{ backgroundColor: "rgba(0, 243, 255, 0.9)", boxShadow: "0 0 8px rgba(0,243,255,0.8)" }}
+                aria-hidden
               >
-                <Sparkles className="w-3 h-3 text-black" />
+                <Camera className="w-4 h-4 text-black" />
               </div>
             </div>
+            <p className="text-xs mb-4" style={{ color: "#71717a" }}>
+              Нажмите на аватар, чтобы изменить фото
+            </p>
 
             {/* Editable Display Name — Input + Save */}
             <div className="w-full space-y-2 mb-6">
